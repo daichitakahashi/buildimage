@@ -1,0 +1,1 @@
+Build Docker image from Dockerfile in tmpdir.
