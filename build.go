@@ -4,9 +4,12 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -15,6 +18,7 @@ import (
 var dockerfile = `
 FROM alpine:3.8
 RUN echo "hello world!"
+ADD notexists /etc/
 `
 
 const imageName = "build:sample"
@@ -59,9 +63,25 @@ func main() {
 		_ = resp.Body.Close()
 	}()
 
-	_, err = io.Copy(os.Stdout, resp.Body)
-	if err != nil {
-		panic(err)
+	var buf strings.Builder
+	dec := json.NewDecoder(resp.Body)
+	for {
+		v := map[string]any{}
+		err = dec.Decode(&v)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			log.Panic(err)
+		}
+		msg, ok := v["stream"].(string)
+		if ok {
+			buf.WriteString(msg)
+		}
+		errorMsg, ok := v["error"]
+		if ok {
+			fmt.Print(buf.String())
+			log.Panic(errorMsg)
+		}
 	}
 }
 
